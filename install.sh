@@ -628,17 +628,18 @@ build_and_start() {
                     echo -e "  ${GREEN}✓ HTTPS (Recommended):${NC} https://${SERVER_IP}:8443/vnc.html"
                     echo -e "  ${YELLOW}  HTTP:${NC} http://${SERVER_IP}:8080/vnc.html"
                 fi
-            echo ""
-            if [[ "$SSL_TYPE" == "self-signed" ]]; then
-                print_warning "Using self-signed certificate - browser will show security warning"
-                print_info "Click 'Advanced' → 'Proceed to ${SERVER_IP}' to continue"
+                echo ""
+                if [[ "$SSL_TYPE" == "self-signed" ]]; then
+                    print_warning "Using self-signed certificate - browser will show security warning"
+                    print_info "Click 'Advanced' → 'Proceed to ${SERVER_IP}' to continue"
+                fi
+            else
+                echo -e "  ${YELLOW}HTTP:${NC} http://${SERVER_IP}:8080/vnc.html"
+                echo -e "  ${YELLOW}Direct:${NC} http://${SERVER_IP}:6080/vnc.html"
+                echo ""
+                print_warning "HTTPS not enabled - limited noVNC features"
+                print_info "Enable HTTPS: ./scripts/generate-ssl.sh"
             fi
-        else
-            echo -e "  ${YELLOW}HTTP:${NC} http://${SERVER_IP}:8080/vnc.html"
-            echo -e "  ${YELLOW}Direct:${NC} http://${SERVER_IP}:6080/vnc.html"
-            echo ""
-            print_warning "HTTPS not enabled - limited noVNC features"
-            print_info "Enable HTTPS: ./scripts/generate-ssl.sh"
         fi
         echo ""
         print_info "VNC Password: ${GREEN}$VNC_PASSWORD${NC}"
