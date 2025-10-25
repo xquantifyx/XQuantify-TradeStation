@@ -103,6 +103,49 @@ check_docker_compose() {
     fi
 }
 
+# Check required tools
+check_dependencies() {
+    print_info "Checking required dependencies..."
+
+    local missing_deps=()
+
+    # Check for openssl
+    if ! command -v openssl &> /dev/null; then
+        missing_deps+=("openssl")
+    fi
+
+    # Check for curl
+    if ! command -v curl &> /dev/null; then
+        missing_deps+=("curl")
+    fi
+
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        print_warning "Missing dependencies: ${missing_deps[*]}"
+        read -p "Install missing dependencies? (y/n): " install_deps
+
+        if [[ $install_deps == "y" ]]; then
+            print_info "Installing dependencies..."
+            if command -v apt-get &> /dev/null; then
+                sudo apt-get update
+                sudo apt-get install -y "${missing_deps[@]}"
+            elif command -v yum &> /dev/null; then
+                sudo yum install -y "${missing_deps[@]}"
+            elif command -v dnf &> /dev/null; then
+                sudo dnf install -y "${missing_deps[@]}"
+            else
+                print_error "Could not detect package manager. Please install manually: ${missing_deps[*]}"
+                exit 1
+            fi
+            print_success "Dependencies installed!"
+        else
+            print_error "Required dependencies are missing. Please install: ${missing_deps[*]}"
+            exit 1
+        fi
+    else
+        print_success "All dependencies found"
+    fi
+}
+
 # Interactive broker selection
 select_broker() {
     echo ""
@@ -198,37 +241,62 @@ configure_installation() {
 
     # SSL Configuration
     echo ""
-    print_info "SSL Configuration (HTTPS)"
-    read -p "Enable SSL with Let's Encrypt? (y/n) [default: n]: " enable_ssl
-    enable_ssl=${enable_ssl:-n}
+    print_info "SSL/HTTPS Configuration"
+    print_warning "HTTPS is required for full noVNC functionality (clipboard, shortcuts, etc.)"
+    echo ""
+    echo "SSL Options:"
+    echo "  1) Self-signed certificate (Recommended - works immediately with IP addresses)"
+    echo "  2) Let's Encrypt (Requires domain name and port 80 available)"
+    echo "  3) Skip SSL setup (HTTP only - limited features)"
+    echo ""
+    read -p "Select SSL option (1-3) [default: 1]: " ssl_option
+    ssl_option=${ssl_option:-1}
 
-    if [[ $enable_ssl == "y" ]]; then
-        SSL_ENABLED="true"
-        print_warning "Let's Encrypt requires:"
-        echo "  - A valid domain name (not IP address)"
-        echo "  - Domain pointing to this server's public IP"
-        echo "  - Port 80 accessible from internet"
-        echo ""
-        read -p "Enter your domain name (e.g., mt5.example.com): " ssl_domain
-        read -p "Enter email for SSL notifications: " ssl_email
+    case $ssl_option in
+        1)
+            SSL_ENABLED="true"
+            SSL_TYPE="self-signed"
+            SSL_DOMAIN=""
+            SSL_EMAIL=""
+            print_success "Self-signed SSL certificate will be generated automatically"
+            ;;
+        2)
+            SSL_ENABLED="true"
+            SSL_TYPE="letsencrypt"
+            print_warning "Let's Encrypt requires:"
+            echo "  - A valid domain name (not IP address)"
+            echo "  - Domain pointing to this server's public IP"
+            echo "  - Port 80 accessible from internet"
+            echo ""
+            read -p "Enter your domain name (e.g., mt5.example.com): " ssl_domain
+            read -p "Enter email for SSL notifications: " ssl_email
 
-        SSL_DOMAIN=$ssl_domain
-        SSL_EMAIL=$ssl_email
-        SETUP_SSL_LATER=false
+            SSL_DOMAIN=$ssl_domain
+            SSL_EMAIL=$ssl_email
 
-        if [[ -z "$SSL_DOMAIN" ]] || [[ -z "$SSL_EMAIL" ]]; then
-            print_warning "Domain or email not provided. SSL setup will be skipped."
-            print_info "You can set up SSL later using: ./scripts/setup-letsencrypt.sh"
+            if [[ -z "$SSL_DOMAIN" ]] || [[ -z "$SSL_EMAIL" ]]; then
+                print_warning "Domain or email not provided. Falling back to self-signed certificate."
+                SSL_TYPE="self-signed"
+                SSL_DOMAIN=""
+                SSL_EMAIL=""
+            fi
+            ;;
+        3)
             SSL_ENABLED="false"
-            SETUP_SSL_LATER=true
-        fi
-    else
-        SSL_ENABLED="false"
-        SSL_DOMAIN=""
-        SSL_EMAIL=""
-        SETUP_SSL_LATER=false
-        print_info "SSL disabled. You can enable it later with: ./scripts/setup-letsencrypt.sh"
-    fi
+            SSL_TYPE="none"
+            SSL_DOMAIN=""
+            SSL_EMAIL=""
+            print_warning "SSL disabled - noVNC will have limited functionality"
+            print_info "You can enable SSL later with: ./scripts/generate-ssl.sh"
+            ;;
+        *)
+            SSL_ENABLED="true"
+            SSL_TYPE="self-signed"
+            SSL_DOMAIN=""
+            SSL_EMAIL=""
+            print_warning "Invalid choice, using self-signed certificate"
+            ;;
+    esac
 }
 
 # Create .env file
@@ -326,10 +394,77 @@ get_server_ip() {
 # Setup directories
 setup_directories() {
     print_info "Creating required directories..."
-    mkdir -p data logs backups nginx/ssl configs scripts
+    mkdir -p data logs backups nginx/ssl nginx/certbot/conf nginx/certbot/www configs scripts
     chmod +x scripts/*.sh 2>/dev/null || true
     chmod +x start.sh 2>/dev/null || true
     print_success "Directories created"
+}
+
+# Generate self-signed SSL certificate
+generate_self_signed_cert() {
+    print_info "Generating self-signed SSL certificate..."
+
+    # Detect server IP
+    SERVER_IP=$(get_server_ip)
+
+    # Create SSL directory
+    mkdir -p nginx/ssl
+    cd nginx/ssl
+
+    # Generate certificate
+    openssl genrsa -out privkey.pem 4096 2>/dev/null
+    openssl req -new -x509 -key privkey.pem -out cert.pem -days 365 \
+        -subj "/C=US/ST=State/L=City/O=XQuantify TradeStation/CN=${SERVER_IP}" \
+        -addext "subjectAltName=IP:${SERVER_IP},DNS:localhost,IP:127.0.0.1" \
+        2>/dev/null
+
+    # Set permissions
+    chmod 644 cert.pem
+    chmod 600 privkey.pem
+
+    cd ../..
+
+    print_success "Self-signed SSL certificate generated"
+    print_info "Certificate location: nginx/ssl/"
+    print_warning "Browser will show a security warning (this is normal)"
+    print_info "Click 'Advanced' -> 'Proceed' to access the site"
+}
+
+# Check for port conflicts
+check_port_conflicts() {
+    print_info "Checking for port conflicts..."
+
+    # Check port 80
+    if command -v netstat &> /dev/null; then
+        PORT80=$(sudo netstat -tlnp 2>/dev/null | grep ":80 " || true)
+    elif command -v ss &> /dev/null; then
+        PORT80=$(sudo ss -tlnp 2>/dev/null | grep ":80 " || true)
+    else
+        PORT80=""
+    fi
+
+    if [[ -n "$PORT80" ]]; then
+        print_warning "Port 80 is in use (may affect Let's Encrypt setup)"
+        if [[ "$SSL_TYPE" == "letsencrypt" ]]; then
+            print_error "Let's Encrypt requires port 80 to be free"
+            print_info "Falling back to self-signed certificate"
+            SSL_TYPE="self-signed"
+        fi
+    fi
+
+    # Check port 443
+    if command -v netstat &> /dev/null; then
+        PORT443=$(sudo netstat -tlnp 2>/dev/null | grep ":443 " || true)
+    elif command -v ss &> /dev/null; then
+        PORT443=$(sudo ss -tlnp 2>/dev/null | grep ":443 " || true)
+    else
+        PORT443=""
+    fi
+
+    if [[ -n "$PORT443" ]]; then
+        print_warning "Port 443 is in use"
+        print_info "Using alternative port 8443 for HTTPS"
+    fi
 }
 
 # Build and start
@@ -339,66 +474,106 @@ build_and_start() {
     start_now=${start_now:-y}
 
     if [[ $start_now == "y" ]]; then
+        # Check for port conflicts before proceeding
+        check_port_conflicts
+
+        # Generate SSL certificate if needed
+        if [[ "$SSL_ENABLED" == "true" ]]; then
+            if [[ "$SSL_TYPE" == "self-signed" ]]; then
+                echo ""
+                generate_self_signed_cert
+            fi
+        fi
+
         print_info "Building Docker image (this may take 5-10 minutes on first run)..."
 
         # Build with broker-specific installer
         if [[ $BROKER_KEY == "custom" ]] && [[ -n $CUSTOM_INSTALLER_URL ]]; then
-            docker-compose build --build-arg MT5_INSTALLER_URL="$CUSTOM_INSTALLER_URL"
+            docker compose build --build-arg MT5_INSTALLER_URL="$CUSTOM_INSTALLER_URL" || docker-compose build --build-arg MT5_INSTALLER_URL="$CUSTOM_INSTALLER_URL"
         else
-            docker-compose build --build-arg BROKER="$BROKER_KEY"
+            docker compose build --build-arg BROKER="$BROKER_KEY" || docker-compose build --build-arg BROKER="$BROKER_KEY"
         fi
 
         print_success "Build completed!"
 
         print_info "Starting services..."
-        docker-compose up -d
+        docker compose up -d || docker-compose up -d
 
         print_success "Services started!"
 
-        # Setup SSL if enabled
-        if [[ "$SSL_ENABLED" == "true" ]] && [[ -n "$SSL_DOMAIN" ]]; then
+        # Setup Let's Encrypt SSL if enabled
+        if [[ "$SSL_ENABLED" == "true" ]] && [[ "$SSL_TYPE" == "letsencrypt" ]] && [[ -n "$SSL_DOMAIN" ]]; then
             echo ""
             print_info "Setting up Let's Encrypt SSL certificate..."
-            ./scripts/setup-letsencrypt.sh "$SSL_DOMAIN"
+            if ./scripts/setup-letsencrypt.sh "$SSL_DOMAIN"; then
+                print_success "Let's Encrypt SSL certificate installed"
+            else
+                print_error "Let's Encrypt setup failed. Falling back to self-signed certificate."
+                generate_self_signed_cert
+                docker compose restart nginx || docker-compose restart nginx
+            fi
         fi
 
         # Detect server IP
         SERVER_IP=$(get_server_ip)
 
         echo ""
-        print_success "Installation complete!"
+        print_success "══════════════════════════════════════════════════"
+        print_success "    Installation Complete!                       "
+        print_success "══════════════════════════════════════════════════"
         echo ""
-        print_info "Access your MT5 platform at:"
-        if [[ "$SSL_ENABLED" == "true" ]] && [[ -n "$SSL_DOMAIN" ]]; then
-            echo -e "  ${GREEN}https://${SSL_DOMAIN}:8443${NC} (HTTPS via nginx)"
-            echo -e "  ${GREEN}http://${SERVER_IP}:8080${NC} (HTTP via nginx)"
-        else
-            echo -e "  ${GREEN}http://${SERVER_IP}:8080${NC} (via nginx load balancer)"
-        fi
-        echo -e "  ${GREEN}http://${SERVER_IP}:6080${NC} (direct access)"
-        echo ""
-        print_info "VNC Password: $VNC_PASSWORD"
+        print_info "Access your MT5 platform:"
         echo ""
         if [[ "$SSL_ENABLED" == "true" ]]; then
-            print_warning "Note: Make sure ports 80, 443, 6080, and 8080/8443 are open in your firewall!"
-            print_info "To open ports, run:"
-            echo "  sudo ufw allow 80/tcp"
-            echo "  sudo ufw allow 443/tcp"
-            echo "  sudo ufw allow 6080/tcp"
-            echo "  sudo ufw allow 8080/tcp"
-            echo "  sudo ufw allow 8443/tcp"
+            if [[ -n "$SSL_DOMAIN" ]]; then
+                echo -e "  ${GREEN}✓ HTTPS (Recommended):${NC} https://${SSL_DOMAIN}:8443/vnc.html"
+                echo -e "  ${YELLOW}  HTTP:${NC} http://${SERVER_IP}:8080/vnc.html"
+            else
+                echo -e "  ${GREEN}✓ HTTPS (Recommended):${NC} https://${SERVER_IP}:8443/vnc.html"
+                echo -e "  ${YELLOW}  HTTP:${NC} http://${SERVER_IP}:8080/vnc.html"
+            fi
+            echo ""
+            if [[ "$SSL_TYPE" == "self-signed" ]]; then
+                print_warning "Using self-signed certificate - browser will show security warning"
+                print_info "Click 'Advanced' → 'Proceed to ${SERVER_IP}' to continue"
+            fi
         else
-            print_warning "Note: Make sure ports 6080 and 8080 are open in your firewall!"
-            print_info "To open ports, run:"
-            echo "  sudo ufw allow 6080/tcp"
-            echo "  sudo ufw allow 8080/tcp"
+            echo -e "  ${YELLOW}HTTP:${NC} http://${SERVER_IP}:8080/vnc.html"
+            echo -e "  ${YELLOW}Direct:${NC} http://${SERVER_IP}:6080/vnc.html"
+            echo ""
+            print_warning "HTTPS not enabled - limited noVNC features"
+            print_info "Enable HTTPS: ./scripts/generate-ssl.sh"
         fi
         echo ""
-        print_info "Useful commands:"
-        echo "  make status    - Check instance status"
-        echo "  make logs      - View logs"
-        echo "  make scale N=3 - Scale to 3 instances"
-        echo "  make stop      - Stop all services"
+        print_info "VNC Password: ${GREEN}$VNC_PASSWORD${NC}"
+        echo ""
+
+        # Firewall configuration
+        print_info "Firewall Configuration:"
+        if [[ "$SSL_ENABLED" == "true" ]]; then
+            echo "  sudo ufw allow 8080/tcp   # HTTP"
+            echo "  sudo ufw allow 8443/tcp   # HTTPS"
+            echo "  sudo ufw allow 6080/tcp   # Direct access"
+        else
+            echo "  sudo ufw allow 8080/tcp   # HTTP"
+            echo "  sudo ufw allow 6080/tcp   # Direct access"
+        fi
+        echo ""
+
+        print_info "Useful Commands:"
+        echo "  docker compose ps              # Check container status"
+        echo "  docker compose logs -f nginx   # View nginx logs"
+        echo "  docker compose restart nginx   # Restart nginx"
+        echo "  docker compose down            # Stop all services"
+        echo "  docker compose up -d           # Start all services"
+        echo ""
+        if command -v make &> /dev/null; then
+            echo "  Or install 'make' for shortcuts:"
+            echo "    apt install make -y"
+            echo "  Then use: make status, make logs, make restart, etc."
+            echo ""
+        fi
+        print_success "Setup complete! Enjoy your MT5 TradeStation!"
         echo ""
     else
         echo ""
@@ -420,6 +595,7 @@ main() {
     # check_platform  # Commented out for WSL2/Windows compatibility
 
     # Check dependencies
+    check_dependencies
     check_docker
     check_docker_compose
 

@@ -1,6 +1,6 @@
 # XQuantify TradeStation - Management Makefile
 
-.PHONY: help install uninstall build start stop restart status logs clean scale backup restore health monitor ssl-setup ssl-renew ssl-status fix-line-endings
+.PHONY: help install uninstall build start stop restart status logs clean scale backup restore health monitor ssl-setup ssl-renew ssl-status fix-line-endings verify
 
 # Default target
 help:
@@ -47,6 +47,9 @@ help:
 	@echo ""
 	@echo "Line Ending Management:"
 	@echo "  fix-line-endings - Convert all files to LF (Unix) line endings"
+	@echo ""
+	@echo "Verification:"
+	@echo "  verify         - Verify installation and check system health"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make install              # Interactive setup"
@@ -309,3 +312,9 @@ fix-line-endings:
 	@echo "  1. git add --renormalize ."
 	@echo "  2. git status"
 	@echo "  3. git commit -m 'Fix line endings to LF'"
+
+# Verification
+verify:
+	@echo "Verifying XQuantify TradeStation installation..."
+	@chmod +x scripts/verify-installation.sh
+	@./scripts/verify-installation.sh
