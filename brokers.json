@@ -1,0 +1,78 @@
+{
+  "brokers": {
+    "metaquotes": {
+      "name": "MetaQuotes (Official)",
+      "installer_url": "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe",
+      "description": "Official MetaTrader 5 from MetaQuotes",
+      "auto_login_support": true
+    },
+    "xm": {
+      "name": "XM Global",
+      "installer_url": "https://download.mql5.com/cdn/web/xm.com/mt5/xmglobal5setup.exe",
+      "description": "XM Global MetaTrader 5",
+      "auto_login_support": true
+    },
+    "fxpro": {
+      "name": "FxPro",
+      "installer_url": "https://download.mql5.com/cdn/web/fxpro.global.limited/mt5/fxpro5setup.exe",
+      "description": "FxPro MetaTrader 5",
+      "auto_login_support": true
+    },
+    "ic_markets": {
+      "name": "IC Markets",
+      "installer_url": "https://download.mql5.com/cdn/web/international.capital.markets.pty.ltd/mt5/icmarkets5setup.exe",
+      "description": "IC Markets MetaTrader 5",
+      "auto_login_support": true
+    },
+    "pepperstone": {
+      "name": "Pepperstone",
+      "installer_url": "https://download.mql5.com/cdn/web/pepperstone.group.limited/mt5/pepperstone5setup.exe",
+      "description": "Pepperstone MetaTrader 5",
+      "auto_login_support": true
+    },
+    "roboforex": {
+      "name": "RoboForex",
+      "installer_url": "https://download.mql5.com/cdn/web/roboforex.ltd/mt5/roboforex5setup.exe",
+      "description": "RoboForex MetaTrader 5",
+      "auto_login_support": true
+    },
+    "avatrade": {
+      "name": "AvaTrade",
+      "installer_url": "https://download.mql5.com/cdn/web/ava.trade.ltd/mt5/avatrade5setup.exe",
+      "description": "AvaTrade MetaTrader 5",
+      "auto_login_support": true
+    },
+    "tickmill": {
+      "name": "Tickmill",
+      "installer_url": "https://download.mql5.com/cdn/web/tickmill.ltd/mt5/tickmill5setup.exe",
+      "description": "Tickmill MetaTrader 5",
+      "auto_login_support": true
+    },
+    "admirals": {
+      "name": "Admirals",
+      "installer_url": "https://download.mql5.com/cdn/web/admirals.global.limited/mt5/admirals5setup.exe",
+      "description": "Admirals (ex-Admiral Markets) MetaTrader 5",
+      "auto_login_support": true
+    },
+    "exness": {
+      "name": "Exness",
+      "installer_url": "https://download.mql5.com/cdn/web/exness.com/mt5/exness5setup.exe",
+      "description": "Exness MetaTrader 5",
+      "auto_login_support": true
+    },
+    "bybit": {
+      "name": "Bybit",
+      "installer_url": "https://download.mql5.com/cdn/web/bybit.com/mt5/bybit5setup.exe",
+      "description": "Bybit MetaTrader 5 (Crypto & Derivatives)",
+      "auto_login_support": true,
+      "note": "Verify MT5 availability with Bybit. May require custom installer URL."
+    },
+    "custom": {
+      "name": "Custom Broker",
+      "installer_url": "",
+      "description": "Use a custom MT5 installer URL or file",
+      "auto_login_support": true,
+      "note": "Set MT5_INSTALLER_URL environment variable to your broker's MT5 installer URL"
+    }
+  }
+}
