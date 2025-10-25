@@ -1,6 +1,6 @@
 # XQuantify TradeStation - Management Makefile
 
-.PHONY: help install uninstall build start stop restart status logs clean scale backup restore health monitor ssl-setup ssl-renew ssl-status
+.PHONY: help install uninstall build start stop restart status logs clean scale backup restore health monitor ssl-setup ssl-renew ssl-status fix-line-endings
 
 # Default target
 help:
@@ -44,6 +44,9 @@ help:
 	@echo "  build-xm       - Build with XM Global MT5"
 	@echo "  build-ic       - Build with IC Markets MT5"
 	@echo "  build-fxpro    - Build with FxPro MT5"
+	@echo ""
+	@echo "Line Ending Management:"
+	@echo "  fix-line-endings - Convert all files to LF (Unix) line endings"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make install              # Interactive setup"
@@ -289,3 +292,20 @@ ssl-self-signed:
 	@echo "Generating self-signed SSL certificate..."
 	@chmod +x scripts/generate-ssl.sh
 	@./scripts/generate-ssl.sh
+
+# Line Ending Management
+fix-line-endings:
+	@echo "Converting all files to LF (Unix) line endings..."
+	@if [ "$$(uname -s)" = "Linux" ] || [ "$$(uname -s)" = "Darwin" ]; then \
+		chmod +x scripts/fix-line-endings.sh; \
+		./scripts/fix-line-endings.sh; \
+	else \
+		echo "Running PowerShell conversion script..."; \
+		powershell -ExecutionPolicy Bypass -File scripts/fix-line-endings.ps1; \
+	fi
+	@echo "✓ Line endings fixed!"
+	@echo ""
+	@echo "Next steps to commit changes:"
+	@echo "  1. git add --renormalize ."
+	@echo "  2. git status"
+	@echo "  3. git commit -m 'Fix line endings to LF'"

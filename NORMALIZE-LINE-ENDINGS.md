@@ -14,8 +14,55 @@ If files are committed with Windows line endings (CRLF), they will cause errors 
 This repository now uses **strict LF (Unix) line endings** for all files, enforced by:
 1. **`.gitattributes`** - Git configuration for line endings
 2. **`.editorconfig`** - Editor configuration for consistency
+3. **Automated conversion scripts** - One-command fix for all files
 
-## One-Time Repository Normalization
+## Quick Fix (Recommended)
+
+The easiest way to fix line endings is using the automated scripts:
+
+### Using Make (All Platforms)
+```bash
+make fix-line-endings
+```
+
+### Using PowerShell (Windows)
+```powershell
+.\scripts\fix-line-endings.ps1
+```
+
+### Using Bash (Linux/Mac/WSL)
+```bash
+chmod +x scripts/fix-line-endings.sh
+./scripts/fix-line-endings.sh
+```
+
+After running the script:
+```bash
+git add --renormalize .
+git status
+git commit -m "Fix line endings to LF"
+git push
+```
+
+### What the Automated Scripts Do
+
+The line ending fix scripts automatically:
+1. ✅ Scan all text files in the repository
+2. ✅ Convert CRLF (Windows) to LF (Unix) line endings
+3. ✅ Skip binary files (images, archives, executables)
+4. ✅ Set executable permissions on shell scripts
+5. ✅ Verify the conversion was successful
+6. ✅ Provide detailed progress output
+
+Files converted include:
+- Shell scripts (`*.sh`)
+- Dockerfiles (`Dockerfile*`)
+- Configuration files (`*.conf`, `*.yml`, `*.yaml`)
+- Makefile
+- Documentation (`*.md`, `*.txt`)
+- Source code (`*.py`, `*.js`, `*.json`, etc.)
+
+## Manual Repository Normalization
 
 ### If You're the Repository Owner (Windows or Linux)
 
