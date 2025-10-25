@@ -252,19 +252,27 @@ docker compose restart nginx
 ```
 
 ### "Port 80 already in use" Error
-Port 80 is being used by another service. Options:
+Port 80 is being used by another service (often system nginx). Options:
 ```bash
-# Option 1: Use self-signed certificate (doesn't need port 80)
-./scripts/generate-ssl.sh
+# Option 1: Use alternative ports (recommended)
+# Docker nginx uses 8080/8443 by default - no conflicts!
+# Access via: https://YOUR_IP:8443/vnc.html
 
-# Option 2: Find what's using port 80
-sudo netstat -tlnp | grep ":80 "
+# Option 2: Setup system nginx as reverse proxy
+./scripts/setup-system-nginx-proxy.sh
+# Access via: https://YOUR_IP/vnc.html (standard ports!)
+
+# Option 3: Find what's using port 80
+sudo ss -tlnp | grep ":80 "
 ./scripts/fix-port-conflict.sh
 
-# Option 3: Stop the conflicting service
+# Option 4: Stop the conflicting service
 sudo systemctl stop apache2  # If Apache
 sudo systemctl stop nginx    # If system nginx
 ```
+
+**Note:** The installer automatically detects nginx conflicts and offers solutions.
+See `NGINX-COEXISTENCE.md` for detailed nginx coexistence guide.
 
 ### Services won't start
 ```bash

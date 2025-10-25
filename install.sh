@@ -430,21 +430,86 @@ generate_self_signed_cert() {
     print_info "Click 'Advanced' -> 'Proceed' to access the site"
 }
 
+# Check for system nginx conflicts
+check_system_nginx() {
+    print_info "Checking for existing nginx installation..."
+
+    # Check if system nginx is running
+    if systemctl is-active --quiet nginx 2>/dev/null; then
+        print_warning "System nginx is running"
+        SYSTEM_NGINX_RUNNING=true
+
+        # Check which ports it's using
+        if command -v ss &> /dev/null; then
+            NGINX_PORTS=$(sudo ss -tlnp 2>/dev/null | grep nginx | grep -oP ':\K[0-9]+' | sort -u | tr '\n' ',' | sed 's/,$//')
+        else
+            NGINX_PORTS="unknown"
+        fi
+
+        echo ""
+        print_warning "Detected system nginx running on ports: $NGINX_PORTS"
+        echo ""
+        echo "XQuantify TradeStation will use alternative ports to avoid conflicts:"
+        echo "  - HTTP:  Port 8080 (instead of 80)"
+        echo "  - HTTPS: Port 8443 (instead of 443)"
+        echo ""
+        echo "Options:"
+        echo "  1) Continue with alternative ports (recommended)"
+        echo "  2) Stop system nginx and use standard ports"
+        echo "  3) Setup system nginx as reverse proxy (advanced)"
+        echo ""
+        read -p "Select option (1-3) [default: 1]: " nginx_option
+        nginx_option=${nginx_option:-1}
+
+        case $nginx_option in
+            1)
+                print_info "Using alternative ports 8080/8443"
+                USE_ALT_PORTS=true
+                SETUP_SYSTEM_PROXY=false
+                ;;
+            2)
+                print_warning "Stopping system nginx..."
+                sudo systemctl stop nginx
+                sudo systemctl disable nginx
+                print_success "System nginx stopped"
+                USE_ALT_PORTS=false
+                SETUP_SYSTEM_PROXY=false
+                SYSTEM_NGINX_RUNNING=false
+                ;;
+            3)
+                print_info "System nginx reverse proxy will be configured after installation"
+                USE_ALT_PORTS=true
+                SETUP_SYSTEM_PROXY=true
+                ;;
+            *)
+                print_warning "Invalid choice, using alternative ports"
+                USE_ALT_PORTS=true
+                SETUP_SYSTEM_PROXY=false
+                ;;
+        esac
+    else
+        print_success "No system nginx detected"
+        SYSTEM_NGINX_RUNNING=false
+        USE_ALT_PORTS=false
+        SETUP_SYSTEM_PROXY=false
+    fi
+}
+
 # Check for port conflicts
 check_port_conflicts() {
     print_info "Checking for port conflicts..."
 
     # Check port 80
-    if command -v netstat &> /dev/null; then
-        PORT80=$(sudo netstat -tlnp 2>/dev/null | grep ":80 " || true)
-    elif command -v ss &> /dev/null; then
+    if command -v ss &> /dev/null; then
         PORT80=$(sudo ss -tlnp 2>/dev/null | grep ":80 " || true)
+    elif command -v netstat &> /dev/null; then
+        PORT80=$(sudo netstat -tlnp 2>/dev/null | grep ":80 " || true)
     else
         PORT80=""
     fi
 
     if [[ -n "$PORT80" ]]; then
-        print_warning "Port 80 is in use (may affect Let's Encrypt setup)"
+        print_warning "Port 80 is in use"
         if [[ "$SSL_TYPE" == "letsencrypt" ]]; then
             print_error "Let's Encrypt requires port 80 to be free"
             print_info "Falling back to self-signed certificate"
@@ -453,10 +518,10 @@ check_port_conflicts() {
     fi
 
     # Check port 443
-    if command -v netstat &> /dev/null; then
-        PORT443=$(sudo netstat -tlnp 2>/dev/null | grep ":443 " || true)
-    elif command -v ss &> /dev/null; then
+    if command -v ss &> /dev/null; then
         PORT443=$(sudo ss -tlnp 2>/dev/null | grep ":443 " || true)
+    elif command -v netstat &> /dev/null; then
+        PORT443=$(sudo netstat -tlnp 2>/dev/null | grep ":443 " || true)
     else
         PORT443=""
     fi
@@ -474,7 +539,10 @@ build_and_start() {
     start_now=${start_now:-y}
 
     if [[ $start_now == "y" ]]; then
-        # Check for port conflicts before proceeding
+        # Check for system nginx conflicts
+        check_system_nginx
+
+        # Check for other port conflicts
         check_port_conflicts
 
         # Generate SSL certificate if needed
@@ -514,6 +582,17 @@ build_and_start() {
             fi
         fi
 
+        # Setup system nginx reverse proxy if requested
+        if [[ "$SETUP_SYSTEM_PROXY" == "true" ]]; then
+            echo ""
+            print_info "Setting up system nginx reverse proxy..."
+            if ./scripts/setup-system-nginx-proxy.sh; then
+                print_success "System nginx reverse proxy configured"
+            else
+                print_warning "System nginx proxy setup failed - you can set it up manually later"
+            fi
+        fi
+
         # Detect server IP
         SERVER_IP=$(get_server_ip)
 
@@ -522,16 +601,33 @@ build_and_start() {
         print_success "    Installation Complete!                       "
         print_success "══════════════════════════════════════════════════"
         echo ""
-        print_info "Access your MT5 platform:"
-        echo ""
-        if [[ "$SSL_ENABLED" == "true" ]]; then
-            if [[ -n "$SSL_DOMAIN" ]]; then
-                echo -e "  ${GREEN}✓ HTTPS (Recommended):${NC} https://${SSL_DOMAIN}:8443/vnc.html"
-                echo -e "  ${YELLOW}  HTTP:${NC} http://${SERVER_IP}:8080/vnc.html"
+
+        # Show access instructions based on configuration
+        if [[ "$SYSTEM_NGINX_RUNNING" == "true" && "$SETUP_SYSTEM_PROXY" == "true" ]]; then
+            print_info "System Nginx Reverse Proxy Mode:"
+            echo ""
+            if [[ "$SSL_ENABLED" == "true" ]]; then
+                echo -e "  ${GREEN}✓ HTTPS (via system nginx):${NC} https://${SERVER_IP}/vnc.html"
+                echo -e "  ${YELLOW}  HTTP (via system nginx):${NC} http://${SERVER_IP}/vnc.html"
+                echo ""
+                echo -e "  ${BLUE}Direct access (bypass nginx):${NC}"
+                echo -e "    HTTPS: https://${SERVER_IP}:8443/vnc.html"
+                echo -e "    HTTP:  http://${SERVER_IP}:8080/vnc.html"
             else
-                echo -e "  ${GREEN}✓ HTTPS (Recommended):${NC} https://${SERVER_IP}:8443/vnc.html"
-                echo -e "  ${YELLOW}  HTTP:${NC} http://${SERVER_IP}:8080/vnc.html"
+                echo -e "  ${YELLOW}HTTP (via system nginx):${NC} http://${SERVER_IP}/vnc.html"
+                echo -e "  ${BLUE}Direct: http://${SERVER_IP}:8080/vnc.html"
             fi
+        else
+            print_info "Access your MT5 platform:"
+            echo ""
+            if [[ "$SSL_ENABLED" == "true" ]]; then
+                if [[ -n "$SSL_DOMAIN" ]]; then
+                    echo -e "  ${GREEN}✓ HTTPS (Recommended):${NC} https://${SSL_DOMAIN}:8443/vnc.html"
+                    echo -e "  ${YELLOW}  HTTP:${NC} http://${SERVER_IP}:8080/vnc.html"
+                else
+                    echo -e "  ${GREEN}✓ HTTPS (Recommended):${NC} https://${SERVER_IP}:8443/vnc.html"
+                    echo -e "  ${YELLOW}  HTTP:${NC} http://${SERVER_IP}:8080/vnc.html"
+                fi
             echo ""
             if [[ "$SSL_TYPE" == "self-signed" ]]; then
                 print_warning "Using self-signed certificate - browser will show security warning"

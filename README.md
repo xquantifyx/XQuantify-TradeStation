@@ -91,6 +91,9 @@ make verify            # Check system health
 - ⏱️ **First-time setup:** ~5-10 minutes (includes Docker image build)
 - ⏱️ **Subsequent rebuilds:** ~30-60 seconds (cached)
 - ✅ **Success rate:** ~99% on fresh installs
+- 🔄 **Works with existing nginx** - Automatic conflict detection and resolution
+
+> **Note:** If you have system nginx installed, the installer automatically detects it and offers three solutions: alternative ports, stop system nginx, or setup reverse proxy. See [NGINX-COEXISTENCE.md](NGINX-COEXISTENCE.md)
 
 ---
 

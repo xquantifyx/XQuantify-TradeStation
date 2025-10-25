@@ -5,7 +5,8 @@
       "Bash(curl:*)",
       "Bash(openssl genrsa:*)",
       "Bash(openssl req:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(docker compose:*)"
     ],
     "deny": [],
     "ask": []
