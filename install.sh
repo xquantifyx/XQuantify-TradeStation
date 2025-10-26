@@ -595,7 +595,8 @@ build_and_start() {
         if [[ "$SSL_ENABLED" == "true" ]] && [[ "$SSL_TYPE" == "letsencrypt" ]] && [[ -n "$SSL_DOMAIN" ]]; then
             echo ""
             print_info "Setting up Let's Encrypt SSL certificate..."
-            if ./scripts/setup-letsencrypt.sh "$SSL_DOMAIN"; then
+            print_info "This will automatically handle port 80 conflicts..."
+            if ./scripts/setup-letsencrypt.sh "$SSL_DOMAIN" "$SSL_EMAIL"; then
                 print_success "Let's Encrypt SSL certificate installed"
             else
                 print_error "Let's Encrypt setup failed. Falling back to self-signed certificate."
