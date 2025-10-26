@@ -6,7 +6,19 @@
       "Bash(openssl genrsa:*)",
       "Bash(openssl req:*)",
       "Bash(chmod:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(bash:*)",
+      "Bash(for script in scripts/*.sh)",
+      "Bash(do echo \"Checking $script\")",
+      "Bash(echo:*)",
+      "Bash(done)",
+      "Bash(for script in scripts/professional-check.sh scripts/setup-system-nginx-proxy.sh scripts/verify-installation.sh)",
+      "Bash(do echo \"Checking: $script\")",
+      "Bash(for script in scripts/professional-check.sh scripts/setup-system-nginx-proxy.sh scripts/verify-installation.sh scripts/fix-port-conflict.sh)",
+      "Bash(for script in install.sh uninstall.sh start.sh scripts/*.sh)",
+      "Bash(do if [ -f \"$script\" ])",
+      "Bash(then echo -n \"Checking $script... \")",
+      "Bash(fi)"
     ],
     "deny": [],
     "ask": []
