@@ -1,20 +1,26 @@
 # XQuantify TradeStation - Quick Start Guide
 
-## ⚡ Super Quick Start (2 Commands)
+## ⚡ Super Quick Start (Production Setup)
 
 ```bash
-# 1. Run the installer (automatically sets up SSL, checks dependencies, etc.)
+# 1. Run the installer with your domain
 chmod +x install.sh && ./install.sh
 
+# During installation, choose:
+# - SSL Option 1: Let's Encrypt (recommended)
+# - Enter your domain: mt5.yourdomain.com
+# - Enter email for SSL notifications
+
 # 2. Access your MT5 platform
-# HTTPS (recommended): https://YOUR_SERVER_IP:8443/vnc.html
-# HTTP: http://YOUR_SERVER_IP:8080/vnc.html
+# HTTPS with trusted cert: https://mt5.yourdomain.com:8443/vnc.html
+# (No browser warnings!)
 ```
 
-That's it! The installer handles everything automatically:
+**What the installer does automatically:**
 - ✅ Checks and installs dependencies (Docker, Docker Compose, OpenSSL)
-- ✅ Generates SSL certificates automatically
-- ✅ Detects port conflicts
+- ✅ Sets up Let's Encrypt SSL (FREE trusted certificate, auto-renews)
+- ✅ Detects and resolves port conflicts
+- ✅ Handles nginx coexistence (if system nginx exists)
 - ✅ Builds and starts all services
 - ✅ Provides access URLs
 
@@ -22,22 +28,46 @@ That's it! The installer handles everything automatically:
 
 ## 🚀 Installation Options
 
-### Option 1: Interactive Setup (Recommended for first-time users)
+### Option 1: Production Setup with Let's Encrypt (Recommended)
 ```bash
 ./install.sh
 ```
-**Features:**
-- Guides you through broker selection
-- Automatic SSL certificate generation (self-signed or Let's Encrypt)
-- Port conflict detection and resolution
-- Dependency checking and installation
-- Configuration wizard
+**Choose SSL Option 1** during installation for trusted certificates.
+
+**Requirements:**
+- Domain name (e.g., mt5.yourdomain.com)
+- Domain DNS points to your server
+- Port 80 accessible from internet
+
+**Benefits:**
+- ✅ FREE trusted SSL certificate from Let's Encrypt
+- ✅ No browser security warnings
+- ✅ Auto-renews every 90 days
+- ✅ Professional production-ready setup
 
 **What you'll be asked:**
 1. Broker selection (MetaQuotes, XM, IC Markets, etc.)
 2. VNC password
-3. SSL/HTTPS setup (automatic self-signed recommended)
-4. Optional: MT5 auto-login credentials
+3. SSL Option: **Choose 1 for Let's Encrypt**
+4. Domain name (e.g., mt5.example.com)
+5. Email for SSL renewal notifications
+6. Optional: MT5 auto-login credentials
+
+### Option 2: Quick Testing with IP Address (Self-Signed)
+```bash
+./install.sh
+```
+**Choose SSL Option 2** during installation for IP-based access.
+
+**Features:**
+- Works immediately without domain name
+- Uses self-signed SSL certificate
+- Browser will show security warning (normal)
+- Perfect for testing and development
+
+**What you'll see:**
+- Access: https://YOUR_SERVER_IP:8443/vnc.html
+- Browser warning: Click "Advanced" → "Proceed" (safe for your own server)
 
 ### Option 2: Manual SSL Setup (If install.sh already ran without SSL)
 ```bash

@@ -44,26 +44,36 @@ Enterprise-grade containerized MT5 deployment with auto-scaling, monitoring, and
 
 ## ⚡ Quick Start
 
-### One-Command Installation
+### One-Command Installation (Production)
 
 ```bash
-# Interactive setup wizard (recommended - includes auto SSL setup)
+# Interactive setup wizard with Let's Encrypt SSL
 chmod +x install.sh && ./install.sh
+
+# During installation, choose:
+# - SSL Option 1: Let's Encrypt (FREE trusted certificate)
+# - Enter your domain: mt5.yourdomain.com
+# - Enter email for SSL notifications
 ```
 
 **The installer automatically:**
 - ✅ Checks and installs dependencies (Docker, OpenSSL, curl)
-- ✅ Generates SSL certificates for HTTPS
+- ✅ Sets up Let's Encrypt SSL (trusted certificate, no browser warnings)
 - ✅ Detects and resolves port conflicts
+- ✅ Handles nginx coexistence automatically
 - ✅ Configures everything for you
 - ✅ Starts services and provides access URLs
 
 ### Access Your MT5 Platform
 
-After installation, access via:
-
+**Production (Let's Encrypt - No browser warnings):**
 ```
-✓ HTTPS (Recommended): https://YOUR_SERVER_IP:8443/vnc.html
+✓ HTTPS: https://mt5.yourdomain.com:8443/vnc.html
+```
+
+**Testing/Development (Self-signed certificate):**
+```
+✓ HTTPS: https://YOUR_SERVER_IP:8443/vnc.html (browser warning - click "Advanced" → "Proceed")
   HTTP: http://YOUR_SERVER_IP:8080/vnc.html
   Direct: http://YOUR_SERVER_IP:6080/vnc.html
 ```
@@ -73,8 +83,12 @@ After installation, access via:
 - ✅ All keyboard shortcuts
 - ✅ Fullscreen mode
 - ✅ Encrypted connection
+- ✅ No security warnings (with Let's Encrypt)
 
-> **Note:** Browser will show security warning for self-signed certificates. Click "Advanced" → "Proceed" to continue.
+**SSL Options:**
+1. **Let's Encrypt** (Recommended) - FREE trusted certificate, auto-renews
+2. **Self-signed** - Quick testing with IP addresses (browser warning expected)
+3. **Skip SSL** - Not recommended (limited features)
 
 ### Alternative Installation Methods
 

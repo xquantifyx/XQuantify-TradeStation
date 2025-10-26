@@ -245,9 +245,16 @@ configure_installation() {
     print_warning "HTTPS is required for full noVNC functionality (clipboard, shortcuts, etc.)"
     echo ""
     echo "SSL Options:"
-    echo "  1) Self-signed certificate (Recommended - works immediately with IP addresses)"
-    echo "  2) Let's Encrypt (Requires domain name and port 80 available)"
-    echo "  3) Skip SSL setup (HTTP only - limited features)"
+    echo "  1) Let's Encrypt - FREE trusted certificate (Recommended for production)"
+    echo "     • No browser security warnings"
+    echo "     • Requires: domain name + port 80 accessible"
+    echo "     • Auto-renews every 90 days"
+    echo ""
+    echo "  2) Self-signed certificate (Quick testing with IP addresses)"
+    echo "     • Works immediately without domain"
+    echo "     • Browser will show security warning (normal)"
+    echo ""
+    echo "  3) Skip SSL setup (Not recommended - HTTP only, limited features)"
     echo ""
     read -p "Select SSL option (1-3) [default: 1]: " ssl_option
     ssl_option=${ssl_option:-1}
@@ -255,21 +262,15 @@ configure_installation() {
     case $ssl_option in
         1)
             SSL_ENABLED="true"
-            SSL_TYPE="self-signed"
-            SSL_DOMAIN=""
-            SSL_EMAIL=""
-            print_success "Self-signed SSL certificate will be generated automatically"
-            ;;
-        2)
-            SSL_ENABLED="true"
             SSL_TYPE="letsencrypt"
-            print_warning "Let's Encrypt requires:"
-            echo "  - A valid domain name (not IP address)"
-            echo "  - Domain pointing to this server's public IP"
-            echo "  - Port 80 accessible from internet"
+            echo ""
+            print_info "Let's Encrypt Setup Requirements:"
+            echo "  ✓ A domain name (e.g., mt5.yourdomain.com)"
+            echo "  ✓ Domain DNS points to this server: $(get_server_ip)"
+            echo "  ✓ Port 80 accessible from internet"
             echo ""
             read -p "Enter your domain name (e.g., mt5.example.com): " ssl_domain
-            read -p "Enter email for SSL notifications: " ssl_email
+            read -p "Enter email for SSL renewal notifications: " ssl_email
 
             SSL_DOMAIN=$ssl_domain
             SSL_EMAIL=$ssl_email
@@ -279,7 +280,19 @@ configure_installation() {
                 SSL_TYPE="self-signed"
                 SSL_DOMAIN=""
                 SSL_EMAIL=""
+                print_info "Self-signed certificate will be generated (browser warning expected)"
+            else
+                print_success "Let's Encrypt will be configured for: $SSL_DOMAIN"
+                print_info "If Let's Encrypt fails, will auto-fallback to self-signed certificate"
             fi
+            ;;
+        2)
+            SSL_ENABLED="true"
+            SSL_TYPE="self-signed"
+            SSL_DOMAIN=""
+            SSL_EMAIL=""
+            print_success "Self-signed SSL certificate will be generated automatically"
+            print_warning "Browser will show security warning - click 'Advanced' → 'Proceed'"
             ;;
         3)
             SSL_ENABLED="false"
@@ -291,10 +304,19 @@ configure_installation() {
             ;;
         *)
             SSL_ENABLED="true"
-            SSL_TYPE="self-signed"
+            SSL_TYPE="letsencrypt"
             SSL_DOMAIN=""
             SSL_EMAIL=""
-            print_warning "Invalid choice, using self-signed certificate"
+            print_warning "Invalid choice. Please provide domain or will use self-signed."
+            read -p "Enter domain name (or press Enter for self-signed): " ssl_domain
+            if [[ -n "$ssl_domain" ]]; then
+                read -p "Enter email for SSL notifications: " ssl_email
+                SSL_DOMAIN=$ssl_domain
+                SSL_EMAIL=$ssl_email
+            else
+                SSL_TYPE="self-signed"
+                print_info "Using self-signed certificate"
+            fi
             ;;
     esac
 }
@@ -621,17 +643,38 @@ build_and_start() {
             print_info "Access your MT5 platform:"
             echo ""
             if [[ "$SSL_ENABLED" == "true" ]]; then
-                if [[ -n "$SSL_DOMAIN" ]]; then
-                    echo -e "  ${GREEN}✓ HTTPS (Recommended):${NC} https://${SSL_DOMAIN}:8443/vnc.html"
-                    echo -e "  ${YELLOW}  HTTP:${NC} http://${SERVER_IP}:8080/vnc.html"
+                if [[ -n "$SSL_DOMAIN" && "$SSL_TYPE" == "letsencrypt" ]]; then
+                    # Let's Encrypt with domain - show clean URLs
+                    echo -e "  ${GREEN}✓ HTTPS (Trusted Certificate):${NC}"
+                    echo -e "    https://${SSL_DOMAIN}:8443/vnc.html"
+                    echo -e "    ${BLUE}(No browser warnings!)${NC}"
+                    echo ""
+                    echo -e "  ${YELLOW}Alternative access:${NC}"
+                    echo -e "    http://${SSL_DOMAIN}:8080/vnc.html (HTTP)"
+                    echo -e "    https://${SERVER_IP}:8443/vnc.html (IP-based)"
+                elif [[ -n "$SSL_DOMAIN" ]]; then
+                    # Domain provided but not Let's Encrypt
+                    echo -e "  ${GREEN}✓ HTTPS:${NC} https://${SSL_DOMAIN}:8443/vnc.html"
+                    echo -e "  ${YELLOW}  HTTP:${NC} http://${SSL_DOMAIN}:8080/vnc.html"
                 else
-                    echo -e "  ${GREEN}✓ HTTPS (Recommended):${NC} https://${SERVER_IP}:8443/vnc.html"
-                    echo -e "  ${YELLOW}  HTTP:${NC} http://${SERVER_IP}:8080/vnc.html"
+                    # IP-based (self-signed)
+                    echo -e "  ${GREEN}✓ HTTPS (Recommended):${NC}"
+                    echo -e "    https://${SERVER_IP}:8443/vnc.html"
+                    echo ""
+                    echo -e "  ${YELLOW}Alternative access:${NC}"
+                    echo -e "    http://${SERVER_IP}:8080/vnc.html (HTTP)"
+                    echo -e "    http://${SERVER_IP}:6080/vnc.html (Direct)"
                 fi
                 echo ""
                 if [[ "$SSL_TYPE" == "self-signed" ]]; then
                     print_warning "Using self-signed certificate - browser will show security warning"
-                    print_info "Click 'Advanced' → 'Proceed to ${SERVER_IP}' to continue"
+                    print_info "To proceed: Click 'Advanced' → 'Proceed to ${SERVER_IP} (unsafe)'"
+                    print_info "This is NORMAL and SAFE for self-signed certificates"
+                    echo ""
+                    print_info "For production with trusted certificate, use Let's Encrypt:"
+                    echo "  ./scripts/setup-letsencrypt.sh yourdomain.com"
+                elif [[ "$SSL_TYPE" == "letsencrypt" ]]; then
+                    print_success "Let's Encrypt certificate installed - no browser warnings!"
                 fi
             else
                 echo -e "  ${YELLOW}HTTP:${NC} http://${SERVER_IP}:8080/vnc.html"
