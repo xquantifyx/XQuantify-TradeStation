@@ -238,8 +238,15 @@ case $CERTBOT_METHOD in
         # Use webroot method with system nginx
         print_info "Configuring system nginx for ACME challenge..."
 
-        # Create webroot directory
-        ${SUDO} mkdir -p /var/www/certbot
+        # Get absolute path to project directory
+        PROJECT_DIR="$(pwd)"
+        WEBROOT_PATH="$PROJECT_DIR/nginx/certbot/www"
+
+        # Ensure webroot directory exists with proper permissions
+        mkdir -p "$WEBROOT_PATH"
+        chmod 755 "$WEBROOT_PATH"
+
+        print_info "Using webroot: $WEBROOT_PATH"
 
         # Create temporary nginx configuration for ACME challenge
         TEMP_NGINX_CONF="/etc/nginx/sites-available/certbot-challenge"
@@ -250,7 +257,8 @@ server {
     server_name $DOMAIN;
 
     location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
+        root $WEBROOT_PATH;
+        try_files \$uri =404;
     }
 
     location / {
@@ -273,9 +281,10 @@ EOF
         fi
 
         # Run certbot with webroot
+        print_info "Requesting certificate from Let's Encrypt..."
         if docker run --rm \
-            -v "$(pwd)/nginx/certbot/conf:/etc/letsencrypt" \
-            -v "/var/www/certbot:/var/www/certbot" \
+            -v "$PROJECT_DIR/nginx/certbot/conf:/etc/letsencrypt" \
+            -v "$WEBROOT_PATH:/var/www/certbot" \
             certbot/certbot certonly \
             --webroot \
             --webroot-path=/var/www/certbot \
